@@ -301,8 +301,11 @@
         
         console.log('Total pages:', pdf.numPages);
         
+        // Support up to 100 pages
+        const maxPages = Math.min(pdf.numPages, 100);
+        
         let allItems = [];
-        for (let i = 1; i <= pdf.numPages; i++) {
+        for (let i = 1; i <= maxPages; i++) {
           const page = await pdf.getPage(i);
           const textContent = await page.getTextContent();
           console.log(`Page ${i} has ${textContent.items.length} text items`);
