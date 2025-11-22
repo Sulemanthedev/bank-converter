@@ -64,19 +64,11 @@
     .footer { text-align: center; margin-top: 2rem; font-size: 0.875rem; color: #64748b; }
     .footer strong { color: #0f172a; font-weight: 600; }
     .hidden { display: none !important; }
-    @media (max-width: 768px) {
-      h1 { font-size: 1.75rem; }
-      .container { padding: 1.5rem 1rem; }
-      .card-content { padding: 1.5rem; }
-      .upload-zone { padding: 2rem 1rem; }
-      .preview-header { flex-direction: column; align-items: flex-start; }
-      .action-buttons { width: 100%; }
-      .btn { width: 100%; justify-content: center; }
-    }
   </style>
 </head>
 <body>
   <div class="container">
+    <!-- Header -->
     <div class="header">
       <div class="icon-wrapper">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -87,6 +79,7 @@
       <p class="subtitle">Convert your PDF bank statements to clean, organized Excel files instantly</p>
     </div>
 
+    <!-- Privacy Notice -->
     <div class="privacy-notice">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -96,6 +89,7 @@
       </div>
     </div>
 
+    <!-- Upload Section -->
     <div id="uploadSection" class="card">
       <div class="card-content">
         <div class="upload-zone" id="dropZone">
@@ -143,6 +137,7 @@
       </div>
     </div>
 
+    <!-- Preview Section -->
     <div id="previewSection" class="card hidden">
       <div class="card-content">
         <div class="preview-header">
@@ -183,6 +178,7 @@
       </div>
     </div>
 
+    <!-- Footer -->
     <div class="footer">
       <strong>Always Free.</strong> No limits, no hidden charges. Fully private.
     </div>
@@ -223,8 +219,10 @@
     fileInput.addEventListener('change', handleFileSelect);
     convertBtn.addEventListener('click', processFile);
     
+    // Download button handler
     downloadBtn.addEventListener('click', function(e) {
       e.preventDefault();
+      console.log('Download button clicked');
       downloadExcel();
     });
     
@@ -325,6 +323,7 @@
     }
 
     function parseFromPDFItems(items) {
+      // Build lines based on Y position
       const lineMap = new Map();
       
       items.forEach(item => {
@@ -338,6 +337,7 @@
         });
       });
       
+      // Sort by Y position and build text lines
       const sortedY = Array.from(lineMap.keys()).sort((a, b) => b - a);
       const lines = sortedY.map(y => {
         const items = lineMap.get(y).sort((a, b) => a.x - b.x);
@@ -347,11 +347,13 @@
       const transactions = [];
       let currentTxn = null;
       
+      // Date pattern for HDFC: DD/MM/YY
       const dateRegex = /^\d{2}\/\d{2}\/\d{2}$/;
       
       for (let line of lines) {
         line = line.trim();
         
+        // Skip empty or header lines
         if (!line || 
             line.includes('Statement of account') ||
             line.includes('Account No') ||
@@ -365,11 +367,14 @@
         
         const parts = line.split(/\s+/);
         
+        // Check if line starts with a date
         if (parts.length > 0 && dateRegex.test(parts[0])) {
+          // Save previous transaction
           if (currentTxn && currentTxn.date) {
             transactions.push(currentTxn);
           }
           
+          // Start new transaction
           currentTxn = {
             date: parts[0],
             narration: '',
@@ -380,13 +385,16 @@
             balance: ''
           };
           
+          // Find amounts (numbers with decimals)
           const amounts = parts.filter(p => /^\d[\d,]*\.\d{2}$/.test(p));
           
+          // Find reference number (10+ digits)
           const refNum = parts.find(p => /^\d{10,}$/.test(p));
           if (refNum) {
             currentTxn.reference = refNum;
           }
           
+          // Find value date (second date in line)
           const dates = parts.filter(p => dateRegex.test(p));
           if (dates.length >= 2) {
             currentTxn.valueDate = dates[1];
@@ -394,6 +402,7 @@
             currentTxn.valueDate = currentTxn.date;
           }
           
+          // Extract narration (text between date and reference/amounts)
           let narrationParts = [];
           let foundDate = false;
           let foundRef = false;
@@ -413,12 +422,14 @@
           
           currentTxn.narration = narrationParts.join(' ');
           
+          // Assign amounts
           if (amounts.length >= 1) {
             currentTxn.balance = amounts[amounts.length - 1];
           }
           
           if (amounts.length >= 2) {
             const amount = amounts[amounts.length - 2];
+            // Check if it's withdrawal or deposit based on narration
             if (currentTxn.narration.toLowerCase().includes('salary') ||
                 currentTxn.narration.toLowerCase().includes('credit') ||
                 currentTxn.narration.toLowerCase().includes('deposit')) {
@@ -429,6 +440,8 @@
           }
           
         } else if (currentTxn && line.length > 5) {
+          // Continuation of previous narration
+          // Only add if it doesn't look like page footer
           if (!line.includes('Page No') && 
               !line.includes('Generated') &&
               !/^\d+$/.test(line)) {
@@ -437,6 +450,7 @@
         }
       }
       
+      // Add last transaction
       if (currentTxn && currentTxn.date) {
         transactions.push(currentTxn);
       }
@@ -479,16 +493,26 @@
     }
 
     function downloadExcel() {
+      console.log('downloadExcel function called');
+      console.log('parsedData exists:', !!parsedData);
+      
       if (!parsedData) {
         alert('No data to download. Please process a file first.');
         return;
       }
       
       try {
+        console.log('Creating workbook...');
         const wb = XLSX.utils.book_new();
+        
+        console.log('Preparing data...');
         const wsData = [parsedData.headers, ...parsedData.rows];
+        console.log('Data rows:', wsData.length);
+        
+        console.log('Creating worksheet...');
         const ws = XLSX.utils.aoa_to_sheet(wsData);
         
+        console.log('Setting column widths...');
         const colWidths = parsedData.headers.map((h, i) => {
           const maxLen = Math.max(
             h.length,
@@ -498,10 +522,16 @@
         });
         ws['!cols'] = colWidths;
         
+        console.log('Adding worksheet to workbook...');
         XLSX.utils.book_append_sheet(wb, ws, 'Bank Statement');
         
+        console.log('Generating filename...');
         const filename = `bank_statement_${new Date().toISOString().split('T')[0]}.xlsx`;
+        console.log('Filename:', filename);
+        
+        console.log('Writing file...');
         XLSX.writeFile(wb, filename);
+        console.log('File written successfully!');
       } catch (err) {
         console.error('Download error:', err);
         alert('Failed to download Excel file. Error: ' + err.message);
