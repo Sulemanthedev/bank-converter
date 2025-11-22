@@ -299,14 +299,21 @@
         const arrayBuffer = await currentFile.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         
+        console.log('Total pages:', pdf.numPages);
+        
         let allItems = [];
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
           const textContent = await page.getTextContent();
+          console.log(`Page ${i} has ${textContent.items.length} text items`);
           allItems = allItems.concat(textContent.items);
         }
 
+        console.log('Total items extracted:', allItems.length);
+        
         parsedData = parseFromPDFItems(allItems);
+        
+        console.log('Transactions found:', parsedData.rows.length);
         
         if (parsedData.rows.length === 0) {
           throw new Error('No transactions found. The PDF might be scanned or in an unsupported format. Please try a different statement.');
