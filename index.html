@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bank Statement Converter</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); min-height: 100vh; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 3rem 1rem; }
+    .header { text-align: center; margin-bottom: 3rem; }
+    .icon-wrapper { display: inline-flex; align-items: center; justify-content: center; width: 4rem; height: 4rem; background: #2563eb; border-radius: 1rem; margin-bottom: 1rem; }
+    .icon-wrapper svg { width: 2rem; height: 2rem; color: white; }
+    h1 { font-size: 2.25rem; font-weight: bold; color: #0f172a; margin-bottom: 0.75rem; }
+    .subtitle { font-size: 1.125rem; color: #64748b; max-width: 48rem; margin: 0 auto; }
+    .privacy-notice { background: #dbeafe; border: 1px solid #93c5fd; border-radius: 0.75rem; padding: 1rem; margin-bottom: 2rem; max-width: 48rem; margin-left: auto; margin-right: auto; display: flex; align-items: flex-start; gap: 0.75rem; }
+    .privacy-notice svg { width: 1.25rem; height: 1.25rem; color: #2563eb; flex-shrink: 0; margin-top: 0.125rem; }
+    .privacy-notice-text { font-size: 0.875rem; color: #1e3a8a; }
+    .card { background: white; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; overflow: hidden; }
+    .card-content { padding: 2rem; }
+    .upload-zone { border: 2px dashed #cbd5e1; border-radius: 0.75rem; padding: 3rem; text-align: center; cursor: pointer; transition: all 0.2s; }
+    .upload-zone:hover { border-color: #60a5fa; }
+    .upload-zone.dragging { border-color: #2563eb; background: #eff6ff; }
+    .upload-icon { width: 3rem; height: 3rem; color: #94a3b8; margin: 0 auto 1rem; }
+    .upload-title { font-size: 1.125rem; font-weight: 600; color: #0f172a; margin-bottom: 0.5rem; }
+    .upload-subtitle { font-size: 0.875rem; color: #64748b; margin-bottom: 1rem; }
+    .file-badge { display: inline-flex; align-items: center; gap: 0.5rem; background: #dbeafe; color: #1e40af; padding: 0.5rem 1rem; border-radius: 0.5rem; margin-bottom: 1rem; }
+    .file-badge svg { width: 1rem; height: 1rem; }
+    .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.625rem 1.5rem; border-radius: 0.5rem; font-weight: 500; border: none; cursor: pointer; transition: all 0.2s; font-size: 0.875rem; }
+    .btn-primary { background: #2563eb; color: white; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
+    .btn-secondary { background: #f1f5f9; color: #334155; }
+    .btn-secondary:hover { background: #e2e8f0; }
+    .btn-lg { padding: 0.75rem 2rem; font-size: 1rem; font-weight: 600; }
+    .error-box { display: flex; align-items: center; gap: 0.75rem; background: #fef2f2; border: 1px solid #fecaca; border-radius: 0.5rem; padding: 1rem; margin-top: 1.5rem; }
+    .error-box svg { width: 1.25rem; height: 1.25rem; color: #dc2626; flex-shrink: 0; }
+    .error-text { font-size: 0.875rem; color: #7f1d1d; }
+    .processing { display: flex; align-items: center; justify-content: center; gap: 0.5rem; color: #2563eb; margin-top: 1.5rem; font-weight: 500; }
+    .spinner { width: 1.25rem; height: 1.25rem; border: 2px solid #2563eb; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .instructions { margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #e2e8f0; }
+    .instructions h4 { font-size: 0.875rem; font-weight: 600; color: #0f172a; margin-bottom: 1rem; }
+    .instructions ul { list-style: none; }
+    .instructions li { display: flex; gap: 0.5rem; font-size: 0.875rem; color: #64748b; margin-bottom: 0.5rem; }
+    .instructions li span:first-child { color: #2563eb; margin-top: 0.125rem; }
+    .preview-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 1rem; }
+    .success-badge { display: flex; align-items: center; gap: 0.75rem; }
+    .success-icon { width: 2.5rem; height: 2.5rem; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .success-icon svg { width: 1.5rem; height: 1.5rem; color: #16a34a; }
+    .success-info h3 { font-size: 1.125rem; font-weight: 600; color: #0f172a; }
+    .success-info p { font-size: 0.875rem; color: #64748b; }
+    .action-buttons { display: flex; gap: 0.5rem; }
+    .table-wrapper { overflow-x: auto; }
+    table { width: 100%; font-size: 0.875rem; border-collapse: collapse; }
+    thead tr { background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+    th { padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: #0f172a; white-space: nowrap; }
+    tbody tr { border-bottom: 1px solid #f1f5f9; }
+    tbody tr:hover { background: #f8fafc; }
+    td { padding: 0.75rem 1rem; color: #334155; white-space: nowrap; }
+    .table-footer { text-align: center; margin-top: 1.5rem; font-size: 0.75rem; color: #94a3b8; }
+    .footer { text-align: center; margin-top: 2rem; font-size: 0.875rem; color: #64748b; }
+    .footer strong { color: #0f172a; font-weight: 600; }
+    .hidden { display: none !important; }
+    @media (max-width: 768px) {
+      h1 { font-size: 1.75rem; }
+      .container { padding: 1.5rem 1rem; }
+      .card-content { padding: 1.5rem; }
+      .upload-zone { padding: 2rem 1rem; }
+      .preview-header { flex-direction: column; align-items: flex-start; }
+      .action-buttons { width: 100%; }
+      .btn { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="icon-wrapper">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+        </svg>
+      </div>
+      <h1>Bank Statement Converter</h1>
+      <p class="subtitle">Convert your PDF bank statements to clean, organized Excel files instantly</p>
+    </div>
+
+    <div class="privacy-notice">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      <div class="privacy-notice-text">
+        <strong>100% Private.</strong> Everything happens in your browser. Your files never leave your device. Nothing is uploaded to any server.
+      </div>
+    </div>
+
+    <div id="uploadSection" class="card">
+      <div class="card-content">
+        <div class="upload-zone" id="dropZone">
+          <input type="file" accept=".pdf" id="fileInput" style="display: none;">
+          <svg class="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+          </svg>
+          <h3 class="upload-title">Upload Bank Statement</h3>
+          <p class="upload-subtitle">PDF format only • Text-based (not scanned)</p>
+          <div id="fileName" class="hidden">
+            <div class="file-badge">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              <span id="fileNameText"></span>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="chooseBtn">Choose File</button>
+        </div>
+
+        <div id="errorMsg" class="error-box hidden">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <p class="error-text" id="errorText"></p>
+        </div>
+
+        <div id="processBtn" class="hidden" style="margin-top: 1.5rem; text-align: center;">
+          <button class="btn btn-primary btn-lg" id="convertBtn">Convert to Excel</button>
+        </div>
+
+        <div id="processing" class="processing hidden">
+          <div class="spinner"></div>
+          <span>Processing your statement...</span>
+        </div>
+
+        <div class="instructions">
+          <h4>Requirements:</h4>
+          <ul>
+            <li><span>•</span><span>Upload a text-based PDF (not a scanned image)</span></li>
+            <li><span>•</span><span>Works with all major Indian banks (HDFC, SBI, ICICI, Axis, and more)</span></li>
+            <li><span>•</span><span>Get a clean Excel file with properly separated columns</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div id="previewSection" class="card hidden">
+      <div class="card-content">
+        <div class="preview-header">
+          <div class="success-badge">
+            <div class="success-icon">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <div class="success-info">
+              <h3>Conversion Complete</h3>
+              <p><span id="totalRows">0</span> transactions extracted • Preview below</p>
+            </div>
+          </div>
+          <div class="action-buttons">
+            <button class="btn btn-primary" id="downloadBtn">
+              <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+              </svg>
+              Download Excel
+            </button>
+            <button class="btn btn-secondary" id="resetBtn">
+              <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="table-wrapper">
+          <table id="previewTable">
+            <thead id="tableHead"></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+
+        <p class="table-footer">Showing first 10 transactions. Download to view all records.</p>
+      </div>
+    </div>
+
+    <div class="footer">
+      <strong>Always Free.</strong> No limits, no hidden charges. Fully private.
+    </div>
+  </div>
+
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    let currentFile = null;
+    let parsedData = null;
+
+    const fileInput = document.getElementById('fileInput');
+    const dropZone = document.getElementById('dropZone');
+    const chooseBtn = document.getElementById('chooseBtn');
+    const fileName = document.getElementById('fileName');
+    const fileNameText = document.getElementById('fileNameText');
+    const errorMsg = document.getElementById('errorMsg');
+    const errorText = document.getElementById('errorText');
+    const processBtn = document.getElementById('processBtn');
+    const convertBtn = document.getElementById('convertBtn');
+    const processing = document.getElementById('processing');
+    const uploadSection = document.getElementById('uploadSection');
+    const previewSection = document.getElementById('previewSection');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    chooseBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      fileInput.click();
+    });
+
+    dropZone.addEventListener('click', (e) => {
+      if (e.target === chooseBtn || chooseBtn.contains(e.target)) return;
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', handleFileSelect);
+    convertBtn.addEventListener('click', processFile);
+    
+    downloadBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      downloadExcel();
+    });
+    
+    resetBtn.addEventListener('click', reset);
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragging');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragging');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragging');
+      const file = e.dataTransfer.files[0];
+      if (file && file.type === 'application/pdf') {
+        currentFile = file;
+        showFileName(file.name);
+      } else {
+        showError('Please upload a valid PDF file');
+      }
+    });
+
+    function handleFileSelect(e) {
+      const file = e.target.files[0];
+      if (file && file.type === 'application/pdf') {
+        currentFile = file;
+        showFileName(file.name);
+        hideError();
+      } else {
+        showError('Please upload a valid PDF file');
+        currentFile = null;
+      }
+    }
+
+    function showFileName(name) {
+      fileNameText.textContent = name;
+      fileName.classList.remove('hidden');
+      processBtn.classList.remove('hidden');
+    }
+
+    function showError(msg) {
+      errorText.textContent = msg;
+      errorMsg.classList.remove('hidden');
+    }
+
+    function hideError() {
+      errorMsg.classList.add('hidden');
+    }
+
+    function reset() {
+      currentFile = null;
+      parsedData = null;
+      fileInput.value = '';
+      fileName.classList.add('hidden');
+      processBtn.classList.add('hidden');
+      processing.classList.add('hidden');
+      uploadSection.classList.remove('hidden');
+      previewSection.classList.add('hidden');
+      hideError();
+    }
+
+    async function processFile() {
+      if (!currentFile) return;
+
+      convertBtn.disabled = true;
+      processing.classList.remove('hidden');
+      hideError();
+
+      try {
+        const arrayBuffer = await currentFile.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        
+        let allItems = [];
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          allItems = allItems.concat(textContent.items);
+        }
+
+        parsedData = parseFromPDFItems(allItems);
+        
+        if (parsedData.rows.length === 0) {
+          throw new Error('No transactions found. The PDF might be scanned or in an unsupported format. Please try a different statement.');
+        }
+
+        showPreview(parsedData);
+        
+      } catch (err) {
+        console.error('Error:', err);
+        showError(err.message || 'Failed to process PDF. Please ensure it is a text-based bank statement.');
+        processing.classList.add('hidden');
+        convertBtn.disabled = false;
+      }
+    }
+
+    function parseFromPDFItems(items) {
+      const lineMap = new Map();
+      
+      items.forEach(item => {
+        const y = Math.round(item.transform[5]);
+        if (!lineMap.has(y)) {
+          lineMap.set(y, []);
+        }
+        lineMap.get(y).push({
+          text: item.str,
+          x: item.transform[4]
+        });
+      });
+      
+      const sortedY = Array.from(lineMap.keys()).sort((a, b) => b - a);
+      const lines = sortedY.map(y => {
+        const items = lineMap.get(y).sort((a, b) => a.x - b.x);
+        return items.map(i => i.text).join(' ');
+      });
+      
+      const transactions = [];
+      let currentTxn = null;
+      
+      const dateRegex = /^\d{2}\/\d{2}\/\d{2}$/;
+      
+      for (let line of lines) {
+        line = line.trim();
+        
+        if (!line || 
+            line.includes('Statement of account') ||
+            line.includes('Account No') ||
+            line.includes('Page No') ||
+            line.includes('Generated') ||
+            line.includes('HDFC BANK') ||
+            line.includes('STATEMENT SUMMARY') ||
+            line.includes('Opening Balance')) {
+          continue;
+        }
+        
+        const parts = line.split(/\s+/);
+        
+        if (parts.length > 0 && dateRegex.test(parts[0])) {
+          if (currentTxn && currentTxn.date) {
+            transactions.push(currentTxn);
+          }
+          
+          currentTxn = {
+            date: parts[0],
+            narration: '',
+            reference: '',
+            valueDate: '',
+            withdrawal: '',
+            deposit: '',
+            balance: ''
+          };
+          
+          const amounts = parts.filter(p => /^\d[\d,]*\.\d{2}$/.test(p));
+          
+          const refNum = parts.find(p => /^\d{10,}$/.test(p));
+          if (refNum) {
+            currentTxn.reference = refNum;
+          }
+          
+          const dates = parts.filter(p => dateRegex.test(p));
+          if (dates.length >= 2) {
+            currentTxn.valueDate = dates[1];
+          } else {
+            currentTxn.valueDate = currentTxn.date;
+          }
+          
+          let narrationParts = [];
+          let foundDate = false;
+          let foundRef = false;
+          
+          for (let p of parts) {
+            if (p === currentTxn.date) {
+              foundDate = true;
+              continue;
+            }
+            if (foundDate && !foundRef && !dateRegex.test(p) && !/^\d{10,}$/.test(p) && !/^\d[\d,]*\.\d{2}$/.test(p)) {
+              narrationParts.push(p);
+            }
+            if (refNum && p === refNum) {
+              foundRef = true;
+            }
+          }
+          
+          currentTxn.narration = narrationParts.join(' ');
+          
+          if (amounts.length >= 1) {
+            currentTxn.balance = amounts[amounts.length - 1];
+          }
+          
+          if (amounts.length >= 2) {
+            const amount = amounts[amounts.length - 2];
+            if (currentTxn.narration.toLowerCase().includes('salary') ||
+                currentTxn.narration.toLowerCase().includes('credit') ||
+                currentTxn.narration.toLowerCase().includes('deposit')) {
+              currentTxn.deposit = amount;
+            } else {
+              currentTxn.withdrawal = amount;
+            }
+          }
+          
+        } else if (currentTxn && line.length > 5) {
+          if (!line.includes('Page No') && 
+              !line.includes('Generated') &&
+              !/^\d+$/.test(line)) {
+            currentTxn.narration += ' ' + line;
+          }
+        }
+      }
+      
+      if (currentTxn && currentTxn.date) {
+        transactions.push(currentTxn);
+      }
+      
+      const headers = ['Date', 'Narration', 'Chq./Ref.No.', 'Value Dt', 'Withdrawal Amt.', 'Deposit Amt.', 'Closing Balance'];
+      const rows = transactions.map(t => [
+        t.date,
+        t.narration.trim().substring(0, 200),
+        t.reference,
+        t.valueDate,
+        t.withdrawal,
+        t.deposit,
+        t.balance
+      ]);
+      
+      return { headers, rows, fullData: transactions };
+    }
+
+    function showPreview(data) {
+      uploadSection.classList.add('hidden');
+      previewSection.classList.remove('hidden');
+      
+      document.getElementById('totalRows').textContent = data.rows.length;
+      
+      const thead = document.getElementById('tableHead');
+      thead.innerHTML = '<tr>' +
+        data.headers.map(h => `<th>${h}</th>`).join('') +
+        '</tr>';
+      
+      const tbody = document.getElementById('tableBody');
+      const previewRows = data.rows.slice(0, 10);
+      tbody.innerHTML = previewRows.map(row => 
+        '<tr>' +
+        row.map(cell => `<td>${cell || '—'}</td>`).join('') +
+        '</tr>'
+      ).join('');
+      
+      convertBtn.disabled = false;
+      processing.classList.add('hidden');
+    }
+
+    function downloadExcel() {
+      if (!parsedData) {
+        alert('No data to download. Please process a file first.');
+        return;
+      }
+      
+      try {
+        const wb = XLSX.utils.book_new();
+        const wsData = [parsedData.headers, ...parsedData.rows];
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        
+        const colWidths = parsedData.headers.map((h, i) => {
+          const maxLen = Math.max(
+            h.length,
+            ...parsedData.rows.map(row => (row[i] || '').toString().length)
+          );
+          return { wch: Math.min(maxLen + 2, 50) };
+        });
+        ws['!cols'] = colWidths;
+        
+        XLSX.utils.book_append_sheet(wb, ws, 'Bank Statement');
+        
+        const filename = `bank_statement_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(wb, filename);
+      } catch (err) {
+        console.error('Download error:', err);
+        alert('Failed to download Excel file. Error: ' + err.message);
+      }
+    }
+  </script>
+</body>
+</html>
